@@ -46,6 +46,7 @@ def get_page(path):
     except FileNotFoundError as f:
         return None
 
+
 def handle_request(client_socket):
 
     # Uncomment this to test speed in I/O bound task
@@ -83,9 +84,7 @@ def setup_server(host, port):
 
     # Start listening
     server_socket.listen(BACKLOG)
-
     print(f"Server listening on {host}:{port}")
-
     return server_socket
 
 
@@ -112,7 +111,6 @@ def handle_connections(server_socket):
                 print(f"Closed the connection from {client_address}")
         
         
-
 def main():
     server_host = LOCALHOST
     server_port = PORT
