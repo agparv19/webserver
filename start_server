@@ -6,6 +6,10 @@ This will create a HTTP server listening at LOCALHOST:PORT
 """
 
 import socket
+import multiprocessing
+import threading
+import os
+import time
 
 # Max number of connections in the queue
 BACKLOG = 5
@@ -20,7 +24,13 @@ STYLE = "utf-8"
 LOCALHOST = "127.0.0.1"
 
 # Port to start the server at
-PORT = 2001
+PORT = 2000
+
+# of Worker processes/threads
+WORKER_SIZE = 4
+
+# Uses multi-processing if set to 0
+USE_THREADING = 0
 
 def get_page(path):
     WEB_DIR = "www" # a dir to store all webpages
@@ -38,6 +48,9 @@ def get_page(path):
 
 def handle_request(client_socket):
 
+    # Uncomment this to test speed in I/O bound task
+    # time.sleep(2)
+
     data = client_socket.recv(MAX_DATA_SIZE).decode(STYLE)
     lines = data.split('\r\n')
     if lines:
@@ -54,9 +67,9 @@ def handle_request(client_socket):
         client_socket.sendall(response.encode(STYLE))
 
 
-def start_server(host, port):
+def setup_server(host, port):
     """
-    Starts the HTTP server and listens forever.
+    Returns a socket listening on (host, port)
     """
 
     # Create a socket object
@@ -73,29 +86,86 @@ def start_server(host, port):
 
     print(f"Server listening on {host}:{port}")
 
-    try:
-        while True:
-            try:
-                # Wait for a connection
-                client_socket, client_address = server_socket.accept()
-                print(f"Received a new connection from {client_address}")
-                handle_request(client_socket)
-            except Exception as e:
-                print(str(e))
-            finally:
-                # Close the connection
-                if client_socket:
-                    client_socket.close()
-                    print(f"Closed the connection from {client_address}")
+    return server_socket
 
+
+def handle_connections(server_socket):
+    """
+    Accepts HTTP requests (forever) listening on
+    server_socket
+    """
+    print(f"Handling connection for {server_socket.getsockname()}, pid: {os.getpid()}")
+    while True:
+        try:
+            # Wait for a connection
+            client_socket, client_address = server_socket.accept()
+            print(f"Received a new connection from {client_address}")
+            handle_request(client_socket)
+        except SystemExit:
+            print("Worker terminating....")
+        except Exception as e:
+            print(str(e))
+        finally:
+            # Close the connection
+            if client_socket:
+                client_socket.close()
+                print(f"Closed the connection from {client_address}")
+        
+        
+
+def main():
+    server_host = LOCALHOST
+    server_port = PORT
+    server_socket = None
+    try:
+        server_socket = setup_server(server_host, server_port)
+    except Exception as e:
+        print(str(e))
+        print("setup_server failed! Exiting...")
+        return
+
+    if server_socket is None:
+        print("Invalid server socket. Exiting")
+        return
+
+    workers = []
+
+    for i in range(WORKER_SIZE):
+        p = None
+        if USE_THREADING:
+            p = threading.Thread(target=handle_connections, args=(server_socket,))
+        else:
+            p = multiprocessing.Process(target=handle_connections, args=(server_socket,))
+        workers.append(p)
+
+    for worker in workers:
+        worker.start()
+
+    try:
+        # Wait until main process is manually killed
+        while True:
+            # do nothing
+            pass
     except KeyboardInterrupt:
         print(f"\nExiting due to a Keyboard interrupt")
     finally:
+        # Close all the workers
+        if not USE_THREADING:
+            for worker in workers:
+                worker.terminate()
+
+        # Wait for all workers to join
+        for worker in workers:
+            # in case of threads this will wait
+            # forever, user will have to send
+            # keyboard interrup-again
+            # Not optimal. 
+            worker.join()
+
         print("Server is shutting down.")
         # Close the server socket
-        server_socket.close()
+        if server_socket:
+            server_socket.close()
 
 if __name__ == "__main__":
-    server_host = LOCALHOST
-    server_port = PORT
-    start_server(server_host, server_port)
+    main()

@@ -2,7 +2,7 @@
 """
 A generic script to write to any request on any host, port.
 
-./send_to_server.py <host> <port> <"request">
+./send_to_server <host> <port> <"request">
 """
 import argparse
 import socket
