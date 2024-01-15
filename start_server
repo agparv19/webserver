@@ -10,6 +10,7 @@ import multiprocessing
 import threading
 import os
 import time
+import argparse
 
 # Max number of connections in the queue
 BACKLOG = 5
@@ -27,12 +28,54 @@ LOCALHOST = "127.0.0.1"
 PORT = 2000
 
 # of Worker processes/threads
-WORKER_SIZE = 4
+WORKER_SIZE = 5
 
 # Uses multi-processing if set to 0
 USE_THREADING = 0
 
+def cpu_bound_task():
+    print("Running cpu bound task")
+    # a dummy cpu bound task
+    n = 100
+    def is_prime(n):
+        if n <= 1:
+            return False
+        elif n == 2:
+            return True
+        elif n % 2 == 0:
+            return False
+        else:
+            for i in range(3, int(n**0.5) + 1, 2):
+                if n % i == 0:
+                    return False
+            return True
+    def find_primes_in_range(start, end):
+        primes = []
+        for number in range(start, end + 1):
+            if is_prime(number):
+                primes.append(number)
+        return primes
+    res = find_primes_in_range(1, 1000000)
+
+
+def io_bound_task():
+    print("Running i/o bound task")
+    # simulates a file read or any other
+    # operation that requires i/o
+    time.sleep(1)
+
+
 def get_page(path):
+
+    # special set-up for testing
+    if path == "/cpu":
+        path = "/"
+        cpu_bound_task()
+    
+    if path == "/io":
+        path = "/"
+        io_bound_task()
+
     WEB_DIR = "www" # a dir to store all webpages
     if path == "":
         return None
@@ -48,10 +91,6 @@ def get_page(path):
 
 
 def handle_request(client_socket):
-
-    # Uncomment this to test speed in I/O bound task
-    # time.sleep(2)
-
     data = client_socket.recv(MAX_DATA_SIZE).decode(STYLE)
     lines = data.split('\r\n')
     if lines:
@@ -116,11 +155,26 @@ def handle_connections(server_socket):
                 client_socket.close()
                 print(f"Closed the connection from {client_address}")
         
-        
+
+def get_args():
+    # ToDo: Enhance this to include host and port as well
+    parser = argparse.ArgumentParser(description="A script to start a basic HTTP server") 
+    parser.add_argument("-p", "--process", action='store_true',
+                         help="Flag to test performance of cpu bound tasks")
+    parser.add_argument("-t", "--thread" , action='store_true',
+                         help="Flag to test performance of i/o bound tasks")
+    args = parser.parse_args()
+    if args.process and args.thread:
+        raise ValueError("Please use -p OR -t")
+    return args
+
+
 def main():
     server_host = LOCALHOST
     server_port = PORT
     server_socket = None
+    args = get_args()
+    USE_THREADING = args.thread
     try:
         server_socket = setup_server(server_host, server_port)
     except Exception as e:
@@ -151,7 +205,7 @@ def main():
             # do nothing
             pass
     except KeyboardInterrupt:
-        print(f"\nExiting due to a Keyboard interrupt")
+        print(f"\nExiting due to a Keyboard interrupt\n")
     finally:
         # Close all the workers
         if not USE_THREADING:
