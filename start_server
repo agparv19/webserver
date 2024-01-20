@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Just run ./start_server
+Usage: ./start_server -p? -t? -w? <workers>
 
 This will create a HTTP server listening at LOCALHOST:PORT
 """
@@ -12,7 +12,7 @@ import os
 import time
 import argparse
 
-# Max number of connections in the queue
+# Max number of connections in the socket queue
 BACKLOG = 5
 
 # Max size of data read from a socket
@@ -32,6 +32,12 @@ WORKER_SIZE = 5
 
 # Uses multi-processing if set to 0
 USE_THREADING = 0
+
+# Global shutdown variable
+shutdown = False
+
+# timeout for socket.accept()
+SOCK_TIMEOUT = 2
 
 def cpu_bound_task():
     print("Running cpu bound task")
@@ -126,6 +132,10 @@ def setup_server(host, port):
     # Should complain if host or port is not valid
     server_socket.bind((host, port))
 
+    # timeout is essential to prevent
+    # waiting forever
+    server_socket.settimeout(SOCK_TIMEOUT)
+
     # Start listening
     server_socket.listen(BACKLOG)
     print(f"Server listening on {host}:{port}")
@@ -137,23 +147,30 @@ def handle_connections(server_socket):
     Accepts HTTP requests (forever) listening on
     server_socket
     """
-    print(f"Handling connection for {server_socket.getsockname()}, pid: {os.getpid()}")
-    while True:
+    print(f"Starting connection worker for {server_socket.getsockname()},"
+           f" pid: {os.getpid()}, tid: {threading.get_ident()}")
+    global shutdown
+    while not shutdown:
+        client_socket = None
         try:
             # Wait for a connection
             # Note that accept() is thread safe
             client_socket, client_address = server_socket.accept()
             print(f"Received a new connection from {client_address}")
             handle_request(client_socket)
+        except socket.timeout:
+            pass
         except SystemExit:
             print("Worker terminating....")
         except Exception as e:
             print(str(e))
         finally:
-            # Close the connection
             if client_socket:
                 client_socket.close()
                 print(f"Closed the connection from {client_address}")
+    # Close the connection (will not happen if worker gets terminated!)
+    print(f"Closing connection worker for: pid: {os.getpid()},"
+           f" tid: {threading.get_ident()}")
         
 
 def get_args():
@@ -163,6 +180,7 @@ def get_args():
                          help="Flag to test performance of cpu bound tasks")
     parser.add_argument("-t", "--thread" , action='store_true',
                          help="Flag to test performance of i/o bound tasks")
+    parser.add_argument('-w', '--workers', type=int, help='Number of workers')
     args = parser.parse_args()
     if args.process and args.thread:
         raise ValueError("Please use -p OR -t")
@@ -174,7 +192,14 @@ def main():
     server_port = PORT
     server_socket = None
     args = get_args()
-    USE_THREADING = args.thread
+
+    if args.thread:
+        global USE_THREADING
+        USE_THREADING = True
+    if args.workers:
+        global WORKER_SIZE
+        WORKER_SIZE = args.workers
+
     try:
         server_socket = setup_server(server_host, server_port)
     except Exception as e:
@@ -200,6 +225,7 @@ def main():
         worker.start()
 
     try:
+        print(f" Main thread tid: {threading.get_ident()}")
         # Wait until main process is manually killed
         while True:
             # do nothing
@@ -207,6 +233,8 @@ def main():
     except KeyboardInterrupt:
         print(f"\nExiting due to a Keyboard interrupt\n")
     finally:
+        global shutdown
+        shutdown = True
         # Close all the workers
         if not USE_THREADING:
             for worker in workers:
@@ -224,6 +252,7 @@ def main():
         # Close the server socket
         if server_socket:
             server_socket.close()
+
 
 if __name__ == "__main__":
     main()

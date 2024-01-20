@@ -1,0 +1,198 @@
+#!/usr/bin/env python3
+"""
+Usage: ./start_async_server
+
+This will create a async HTTP server listening at LOCALHOST:PORT
+
+"""
+
+import socket
+import os
+import asyncio
+import threading
+import aiofiles
+
+# Max number of connections in the socket queue
+BACKLOG = 5
+
+# Max size of data read from a socket
+MAX_DATA_SIZE = 1024
+
+# Encoding style
+STYLE = "utf-8"
+
+# Localhost
+LOCALHOST = "127.0.0.1"
+
+# Port to start the server at
+PORT = 2000
+
+
+async def cpu_bound_task():
+    # no point in making this async as it will
+    # never call await and thus will not be a 
+    # coperative coroutine!
+
+    print("Running cpu bound task")
+    # a dummy cpu bound task
+    n = 100
+    def is_prime(n):
+        if n <= 1:
+            return False
+        elif n == 2:
+            return True
+        elif n % 2 == 0:
+            return False
+        else:
+            for i in range(3, int(n**0.5) + 1, 2):
+                if n % i == 0:
+                    return False
+            return True
+    def find_primes_in_range(start, end):
+        primes = []
+        for number in range(start, end + 1):
+            if is_prime(number):
+                primes.append(number)
+        return primes
+    res = find_primes_in_range(1, 1000000)
+
+
+async def io_bound_task():
+    print("Running i/o bound task")
+    # simulates a file read or any other
+    # operation that requires i/o
+    await asyncio.sleep(1)
+
+
+async def get_page(path):
+
+    # special set-up for testing
+    if path == "/cpu":
+        path = "/"
+        await cpu_bound_task()
+    
+    if path == "/io":
+        path = "/"
+        await io_bound_task()
+
+    WEB_DIR = "www" # a dir to store all webpages
+    if path == "":
+        return None
+    if path == "/":
+        path = "/index.html"
+
+    try:
+        async with aiofiles.open(WEB_DIR + path, 'r') as file:
+            content = await file.read()
+        return content
+    except FileNotFoundError as f:
+        return None
+
+
+async def handle_request(client_socket, client_address):
+    try:
+        loop = asyncio.get_event_loop()
+        try:
+            data = (await loop.sock_recv(client_socket, MAX_DATA_SIZE)).decode(STYLE)
+            lines = data.split('\r\n')
+            if lines:
+                line = lines[0]
+                words = line.split(' ')
+                path = "" if len(words) < 2 else words[1]
+                content = await get_page(path)
+                response_code = "200 OK" if content else "404 Not Found"
+                # Create the response
+                response = f"HTTP/1.1 {response_code}\r\n\r\n"
+                if content:
+                    response += f"{content}\r\n"
+                # Respond to the client
+                await loop.sock_sendall(client_socket, response.encode(STYLE))
+        except Exception as e:
+            print(str(e))
+        finally:
+            if client_socket:
+                client_socket.close()
+                print(f"Closed the connection from {client_address}")
+    except asyncio.CancelledError:
+        print("[handle_request] Coroutine cancelled....")
+
+
+def setup_server(host, port):
+    """
+    Returns a socket listening on (host, port)
+    """
+
+    # Create a socket object
+    # socket.AF_INET: indicates IPv4
+    # socket.SOCK_STREAM: indicates TCP
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Allow reuse of the local address the socket is bound to.
+    # Avoids the "Address already in use" error that might occur if the server
+    # is restarted and the previous socket is still in the TIME_WAIT state.
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    # Bind the socket to a specific host and port
+    # Should complain if host or port is not valid
+    server_socket.bind((host, port))
+
+    # server_socket must be non-blocking for async
+    server_socket.setblocking(False)
+
+    # Start listening
+    server_socket.listen(BACKLOG)
+    print(f"Server listening on {host}:{port}")
+    return server_socket
+
+
+async def handle_connections(server_socket):
+    """
+    Accepts HTTP requests (forever) listening on
+    server_socket
+    """
+    try:
+        print(f"Handling connection for {server_socket.getsockname()}, pid: {os.getpid()}, tid: {threading.get_ident()}")
+        loop = asyncio.get_event_loop()
+        while True:
+            try:
+                # Wait for a connection
+                # In async mode, note that this won't really wait but 'await'
+                client_socket, client_address = await loop.sock_accept(server_socket) 
+                print(f"Received a new connection from {client_address}")
+                # this creates and runs the task asynchronously
+                loop.create_task(handle_request(client_socket, client_address))
+            except Exception as e:
+                print(str(e))
+    except asyncio.CancelledError:
+        print("[handle_connections] Coroutine cancelled....")
+                  
+
+def main():
+    server_host = LOCALHOST
+    server_port = PORT
+    server_socket = None
+    try:
+        server_socket = setup_server(server_host, server_port)
+    except Exception as e:
+        print(str(e))
+        print("setup_server failed! Exiting...")
+        return
+    
+    if server_socket is None:
+        print("Invalid server socket. Exiting")
+        return
+    
+    try:
+        print(f"Main thread tid: {threading.get_ident()}")
+        asyncio.run(handle_connections(server_socket))
+    except KeyboardInterrupt:
+        print(f"\nExiting due to a Keyboard interrupt\n")
+    finally:
+        print("Server is shutting down.")
+        # Close the server socket
+        if server_socket:
+            server_socket.close()
+
+
+if __name__ == "__main__":
+    main()

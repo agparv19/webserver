@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """
-A generic script to test an HTTP server's performance
+Usage: ./test_my_server -c(cpu)/-i(io) -nc? <clients> <host> <port>
 
+A generic script to test an HTTP server's performance
 """
 
 import requests
@@ -20,7 +21,7 @@ def send_http_request(host, port, endpoint):
     print(f"{url} - Status Code: {response.status_code}, took {(end-start)*1000:.2f} ms")
     #print(response.text)
     #print("\n")
-    
+
 
 def send_parallel_requests(host, port, endpoint):
     processes = []
@@ -47,6 +48,7 @@ def get_args():
                          help="Flag to test performance of cpu bound tasks")
     parser.add_argument("-i", "--io" , action='store_true',
                          help="Flag to test performance of i/o bound tasks")
+    parser.add_argument('-nc', '--clients', type=int, help='Number of clients')
     parser.add_argument("host")
     parser.add_argument("port") 
     args = parser.parse_args()
@@ -64,6 +66,9 @@ def main():
         raise ValueError("Can't test cpu and io performance together. Please use -c OR -i")
     if not (args.cpu or args.io):
         raise ValueError("Specify cpu and io performance to test. Please use -c OR -i")
+    if args.clients:
+        global CLIENTS
+        CLIENTS = args.clients
 
     send_parallel_requests(args.host, args.port, endpoint)
     
