@@ -28,7 +28,7 @@ Starting connection worker for ('127.0.0.1', 2000), pid: 26419, tid: 14064785330
 
 ```
 
-To talk to this HTTP server, you can use curl:
+To talk to this HTTP server, you can use `curl`:
 ```
 $:~/path_to_your_repo/webserver (main)$curl -i 127.0.0.1:2000
 HTTP/1.1 200 OK
@@ -60,9 +60,18 @@ http://127.0.0.1:2000/
 
 To compare against different architectures, you can start the HTTP server in the mode you want and use `./test_my_server` to send concurrent connections to the server, and get back the overall response time. Example usage:
 ```
-./test_my_server -c -nc 10 127.0.0.1 2000
+$:~/path_to_your_repo/webserver (main)$./test_my_server -i -nc 4 127.0.0.1 2000
+http://127.0.0.1:2000/io - Status Code: 200, took 1072.60 ms
+http://127.0.0.1:2000/io - Status Code: 200, took 1102.88 ms
+http://127.0.0.1:2000/io - Status Code: 200, took 2155.36 ms
+http://127.0.0.1:2000/io - Status Code: 200, took 2211.57 ms
+Total time taken 2216.14 ms
 ```
 
 Use `-c` to test cpu bound task, and `-i` for i/o bound task. Number of concurrent connection the test scripts tries to make is configurable by `-nc`.
+
+Preliminary stats are available in the file `Performance Stats.xlsx`. Some graphs from the same:
+
+![alt text](https://github.com/[agparv19]/[webserver]/blob/[main]/CPU\ Bound\ Task.png?raw=true)
 
 
