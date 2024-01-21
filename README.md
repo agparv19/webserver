@@ -72,6 +72,6 @@ Use `-c` to test cpu bound task, and `-i` for i/o bound task. Number of concurre
 
 Preliminary stats are available in the file `Performance Stats.xlsx`. Some graphs from the same:
 
-![alt text](https://github.com/[agparv19]/[webserver]/blob/[main]/CPU\ Bound\ Task.png?raw=true)
+![alt text](https://github.com/[agparv19]/[webserver]/blob/[main]/CPU_Bound_Task.png?raw=true)
 
 
