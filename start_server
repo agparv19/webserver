@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Usage: ./start_server -p? -t? -w? <workers>
+Usage: ./start_server -p(multi process)? -t(multi thread)? -w? <workers>
 
 This will create a HTTP server listening at LOCALHOST:PORT
 """
@@ -177,9 +177,9 @@ def get_args():
     # ToDo: Enhance this to include host and port as well
     parser = argparse.ArgumentParser(description="A script to start a basic HTTP server") 
     parser.add_argument("-p", "--process", action='store_true',
-                         help="Flag to test performance of cpu bound tasks")
+                         help="Flag indicating server will run in multi-process mode")
     parser.add_argument("-t", "--thread" , action='store_true',
-                         help="Flag to test performance of i/o bound tasks")
+                         help="Flag indicating server will run in multi-thread mode")
     parser.add_argument('-w', '--workers', type=int, help='Number of workers')
     args = parser.parse_args()
     if args.process and args.thread:
