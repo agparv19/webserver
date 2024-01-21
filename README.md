@@ -1,4 +1,4 @@
-This is a basic HTTP server written from scratch in Python which can respond to GET requests for webpages stored in www directory. The motivation behind this project is [this coding challenge](https://codingchallenges.fyi/challenges/challenge-webserver).
+This is a basic HTTP server written from scratch in Python which can respond to GET requests for webpages stored in `www` directory. The motivation behind this project is [this coding challenge](https://codingchallenges.fyi/challenges/challenge-webserver).
 
 Beyond learning to deal with sockets, in this project, multiple server architechures are implemented along with a testing framework to understand how they compare against one another.
 
@@ -72,15 +72,15 @@ Use `-c` to test cpu bound task, and `-i` for i/o bound task. Number of concurre
 
 Preliminary stats are available in the file `Performance Stats.xlsx`. 
 
-Following graphs show response time for different architectures (in ms) as number of clients increase. (This were generated with 5 workers)
+Following graphs show response time for different architectures (in ms) as number of clients increase. (These were generated with 5 workers)
 
 ![alt text](CPU_Bound_Task.png)
 ![alt text](I_O_Bound_Task.png)
 
-Couple of things evident from data:
+Couple of things evident from above data:
 
 - Asyncio is really good for I/O bound task as all coroutines can wait in parallel
-- Multi-threaded server in Python is good for nothing as GIL prevents true parallel processing
+- Multi-threaded server in Python is can not beat other archs as GIL prevents true parallel processing
 - If your request is CPU heavy, multi-processing continues to be the most performant
 
 Looks like a server implementing multi-processing architecture, where each process (worker) can handle incoming request asynchronously can be best of both world for a generic set of requests.
